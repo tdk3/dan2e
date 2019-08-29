@@ -1,14 +1,16 @@
 import numpy as np
+import pickle
 from scipy.optimize import minimize_scalar
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
-
+from time import strftime, gmtime
 
 class DAN2Regressor(object):
 
     def __init__(self, depth=10):
         #super(ClassName, self).__init__()
+        self.model_name = strftime('dan2model-%Y-%b-%d-%H-%M-%S', gmtime())
         self.depth = depth
         self.layers = None
         self.lr = None
@@ -19,7 +21,9 @@ class DAN2Regressor(object):
         self.model = {
             'weights': None,
             'intercept': None,
-            'mu': None
+            'mu': None,
+            'f_0': None,
+            'alpha': None
         }
 
     """ Layer activation """
@@ -41,13 +45,13 @@ class DAN2Regressor(object):
 
         """ Create resultant vector of ones """
         R = np.ones(cols)
-        print('R', R.shape)
+        #print('R', R.shape)
 
         """ Compute dot product """
         X_dot_R = (1 + np.dot(X,R))
-        print('XdR', X_dot_R.shape)
+        #print('XdR', X_dot_R.shape)
         X_dot_R = X_dot_R.reshape((len(X),))
-        print('XdR', X_dot_R.shape)
+        #print('XdR', X_dot_R.shape)
 
         """ Compute X and R magnitudes """
         X_mag = np.sqrt(1*1 + np.sum(np.square(X), axis=1))
@@ -55,7 +59,7 @@ class DAN2Regressor(object):
 
         """ Compute arccosine """
         acos = np.arccos(X_dot_R / (X_mag * R_mag))
-        print('acos', acos.shape)
+        #print('acos', acos.shape)
 
         return acos.reshape(len(acos),1) 
 
@@ -102,11 +106,13 @@ class DAN2Regressor(object):
     def fit(self, X, y, f_0):
 
         alpha = self.compute_alpha(X)
+        self.model['alpha'] = alpha
         print('alpha',alpha.shape)
         """ Determine linear input layer """
         """ Eventually let user pass different classifiers in for this step """
         if f_0 is None:
             f_0, A, a = self.linear_reg(X, y)
+            self.model['f_0'] = f_0
         else: 
             f_0 = f_0
 
@@ -177,4 +183,6 @@ class DAN2Regressor(object):
 
     def plot_error():
         pass
+
+    
 
