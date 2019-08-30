@@ -8,23 +8,27 @@ from time import strftime, gmtime
 
 class DAN2Regressor(object):
 
-    def __init__(self, depth=10):
-        #super(ClassName, self).__init__()
-        self.model_name = strftime('dan2model-%Y-%b-%d-%H-%M-%S', gmtime())
-        self.depth = depth
-        self.layers = None
-        self.lr = None
-        self.f_k = None
-        self.A = None
-        self.alpha = None
-        self.a = None
-        self.model = {
-            'weights': None,
-            'intercept': None,
-            'mu': None,
-            'f_0': None,
-            'alpha': None
-        }
+    def __init__(self, depth=10, bounds=(0,5000000000), *args):
+
+        if len(args)!=0:
+            self.model_name = 
+        else:
+            self.model_name = strftime('dan2model-'+ str(depth) + '-%Y-%b-%d-%H-%M-%S', gmtime())
+            self.f_k = None
+            self.A = None
+            self.alpha = None
+            self.a = None
+            self.model = {
+                'weights': None,
+                'intercept': None,
+                'mu': None,
+                'f_0': None,
+                'alpha': None,
+                'bounds': bounds,
+                'depth': depths,
+                'lr': None,
+            }
+
 
     """ Layer activation """
     def f(self, x):
@@ -38,6 +42,7 @@ class DAN2Regressor(object):
         #Xn = np.hstack((a, A[0]*f, A[1]*np.cos(alpha*x), A[2]*np.sin(alpha*x)))
         Xn = a + A[0]*f + A[1]*np.cos(alpha*x) + A[2]*np.sin(alpha*x)
         return np.sum(Xn)
+
 
     """ Method to get alpha column for DAN2 """
     def compute_alpha(self, X):
@@ -66,20 +71,14 @@ class DAN2Regressor(object):
 
     """ Linear method """
     def linear_reg(self, X, y):
-        self.lr = LinearRegression(fit_intercept=True).fit(X, y)
-        '''
-        if logistic is not True:
-            pred = self.lr.predict(X)
-        else:
-            pred = self.lr.predict(X)
-            pred = np.where(pred >= 0.5, 1, 0)'''
-        return self.lr.predict(X), self.lr.coef_[0], self.lr.intercept_
+        self.model['lr'] = LinearRegression(fit_intercept=True).fit(X, y)
+        return self.model['lr'].predict(X), self.model['lr'].coef_[0], self.model['lr'].intercept_
 
 
     ''' '''
     def build_X1(self, f, alpha, mu=1):
-        print('f', f.shape)
-        print('alpha', alpha.shape)
+        #print('f', f.shape)
+        #print('alpha', alpha.shape)
 
         return np.hstack((f, np.cos(alpha*mu), np.sin(alpha*mu)))
 
@@ -91,7 +90,6 @@ class DAN2Regressor(object):
 
 
     def logging(self, weights, intercept, mu):
-
         if self.model['weights'] is None:
             self.model['weights'] = weights.reshape((1,3))
             self.model['intercept'] = np.array(intercept)
@@ -140,9 +138,6 @@ class DAN2Regressor(object):
                 acc = accuracy_score(y, pred)
                 #mse = np.sum((f_k - y)**2) / Xn.shape[0]
 
-                
-
-
             else:
                 mu = self.minimize(f_k, A, a, alpha)
                 Xn = self.build_Xn(f_k, A, a, alpha, mu)
@@ -165,21 +160,23 @@ class DAN2Regressor(object):
             i += 1
         """ #### """
 
+
     def minimize(self, f_k, A, a, alpha):
-        print(f_k.shape)
-        print(A.shape)
-        print(a.shape)
-        print(alpha.shape)
+        #print(f_k.shape)
+        #print(A.shape)
+        #print(a.shape)
+        #print(alpha.shape)
         self.f_k = f_k
         self.A = A
         self.alpha = alpha
         self.a = a
-        res = minimize_scalar(self.f, bounds=(0,5000000000), method='bounded')
+        res = minimize_scalar(self.f, bounds=self.bounds, method='bounded')
         return res.x
         
 
     def mse(self, f_k, y, m):
         return np.sum((f_k - y)**2) / m        
+
 
     def plot_error():
         pass
