@@ -8,26 +8,28 @@ from time import strftime, gmtime
 
 class DAN2Regressor(object):
 
-    def __init__(self, depth=10, bounds=(0,5000000000), *args):
+    def __init__(self, depth=10, bounds=(0,5000000000)):
 
-        if len(args)!=0:
-            self.model_name = 
-        else:
-            self.model_name = strftime('dan2model-'+ str(depth) + '-%Y-%b-%d-%H-%M-%S', gmtime())
-            self.f_k = None
-            self.A = None
-            self.alpha = None
-            self.a = None
-            self.model = {
-                'weights': None,
-                'intercept': None,
-                'mu': None,
-                'f_0': None,
-                'alpha': None,
-                'bounds': bounds,
-                'depth': depths,
-                'lr': None,
-            }
+        #if kwargs['model'] is None:
+        self.model = {
+            'name': strftime('dan2model-'+ str(depth) + '-%Y-%b-%d-%H-%M-%S', gmtime()),
+            'weights': None,
+            'intercept': None,
+            'mu': 1,
+            'f_0': None,
+            'f_k': None,
+            'A': None,
+            'alpha': None,
+            'a': None,
+            'bounds': bounds,
+            'depth': depth,
+            'lr': None,
+            'mu_hist': None
+        }
+
+        #else:
+        #    self.model = kwargs['model']
+            
 
 
     """ Layer activation """
@@ -76,11 +78,11 @@ class DAN2Regressor(object):
 
 
     ''' '''
-    def build_X1(self, f, alpha, mu=1):
+    def build_X1(self, f, alpha):
         #print('f', f.shape)
         #print('alpha', alpha.shape)
 
-        return np.hstack((f, np.cos(alpha*mu), np.sin(alpha*mu)))
+        return np.hstack((f, np.cos(alpha*self.model['mu']), np.sin(alpha*self.model['mu'])))
 
 
     ''' '''
@@ -93,69 +95,61 @@ class DAN2Regressor(object):
         if self.model['weights'] is None:
             self.model['weights'] = weights.reshape((1,3))
             self.model['intercept'] = np.array(intercept)
-            self.model['mu'] = np.array(mu)
+            self.model['mu_hist'] = np.array(mu)
         else:
             self.model['weights'] = np.append(self.model['weights'], weights.reshape((1,3)), axis=0)
             self.model['intercept'] = np.append(self.model['intercept'], intercept)
-            self.model['mu'] = np.append(self.model['mu'], mu)
+            self.model['mu_hist'] = np.append(self.model['mu'], mu)
 
 
     """ Fit method  """
-    def fit(self, X, y, f_0):
+    def fit(self, X, y):
 
-        alpha = self.compute_alpha(X)
-        self.model['alpha'] = alpha
-        print('alpha',alpha.shape)
-        """ Determine linear input layer """
-        """ Eventually let user pass different classifiers in for this step """
-        if f_0 is None:
-            f_0, A, a = self.linear_reg(X, y)
-            self.model['f_0'] = f_0
-        else: 
-            f_0 = f_0
+        ## Get non-linear projection of input records
+        self.model['alpha'] = self.compute_alpha(X)
+        
+        ## Get linear model from n input cols
+        self.model['f_0'], self.model['A'], self.model['a'] = self.linear_reg(X, y)
+        
 
         """ Call algorithm """
         """ #### """
         i = 0
-        while (i<=self.depth):
-            print(i)
+        while (i<=self.model['depth']):
             ''' Initial layer assumes 1 for mu '''
             if i==0:
-                mu = 1
-                Xn = self.build_X1(f_0, alpha)
+                Xn = self.build_X1(self.model['f_0'], self.model['alpha'])
 
                 # Number of rows
                 m = Xn.shape[0]
 
                 # Initial linear regression w/ mu equal to 1
-                f_k, A, a = self.linear_reg(Xn, y)
+                self.model['f_k'], self.model['A'], self.model['a'] = self.linear_reg(Xn, y)
 
                 # Error metrics
-                mse = self.mse(f_k, y, m)
-                pred = np.where(f_k >= 0.5, 1, 0)
-
-                print(y)
+                mse = self.mse(self.model['f_k'], y, m)
+                pred = np.where(self.model['f_k'] >= 0.5, 1, 0)
                 acc = accuracy_score(y, pred)
                 #mse = np.sum((f_k - y)**2) / Xn.shape[0]
 
             else:
-                mu = self.minimize(f_k, A, a, alpha)
-                Xn = self.build_Xn(f_k, A, a, alpha, mu)
-                f_k, A, a = self.linear_reg(Xn, y)
-                mse = self.mse(f_k, y, m)
-                pred = np.where(f_k >= 0.5, 1, 0)
+                self.model['mu'] = self.minimize(self.model['f_k'], self.model['A'], self.model['a'], self.model['alpha'])
+                Xn = self.build_Xn(self.model['f_k'], self.model['A'], self.model['a'], self.model['alpha'], self.model['mu'])
+                self.model['f_k'], self.model['A'], self.model['a'], = self.linear_reg(Xn, y)
+                mse = self.mse(self.model['f_k'], y, m)
+                pred = np.where(self.model['f_k'] >= 0.5, 1, 0)
                 acc = accuracy_score(y, pred)
-                print(A.shape)
+                #print(A.shape)
                 #mse = np.sum((f_k - y)**2) / Xn.shape[0]
             '''
             # move MSE here, change function to receive logistic flag
             mse = self.error(f_k, y, m, logstic)'''
             
             # Save layer
-            self.logging(A, a, mu)
+            self.logging(self.model['A'], self.model['a'], self.model['mu'])
 
             # add layers
-            print('Iteration:', i, " Mu:", mu, "MSE:", mse, "Accuracy:", acc)
+            print('Iteration:', i, " Mu:", self.model['mu'], "MSE:", mse, "Accuracy:", acc)
 
             i += 1
         """ #### """
@@ -170,7 +164,7 @@ class DAN2Regressor(object):
         self.A = A
         self.alpha = alpha
         self.a = a
-        res = minimize_scalar(self.f, bounds=self.bounds, method='bounded')
+        res = minimize_scalar(self.f, bounds=self.model['bounds'], method='bounded')
         return res.x
         
 

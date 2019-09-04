@@ -41,18 +41,14 @@ def save_file(path, model):
 
 def main(X, y, depth):
     clf = dan2.DAN2Regressor(depth=depth)
-    clf.fit(X, y, f_0=None)
-
-    path = clf.model_name
+    clf.fit(X, y)
+    path = clf.model['name']
     model = clf.model
     save_file(path, model)
 
 
 
 if __name__ == '__main__':
-
-    print(sys.argv)
-
     X = load_file(sys.argv[1])
     y = load_file(sys.argv[2])
     y = y.reshape(len(y), 1)
