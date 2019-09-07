@@ -26,6 +26,10 @@ class DAN2Regressor(object):
             'lr': None,
             'mu_hist': None
         }
+        self.depth = depth
+        self.lin_predictor = LinearRegression(fit_intercept=True)
+        
+
 
         #else:
         #    self.model = kwargs['model']
@@ -79,15 +83,16 @@ class DAN2Regressor(object):
 
     ''' '''
     def build_X1(self, f, alpha):
-        #print('f', f.shape)
-        #print('alpha', alpha.shape)
-
-        return np.hstack((f, np.cos(alpha*self.model['mu']), np.sin(alpha*self.model['mu'])))
+        return np.hstack((f, np.cos(alpha), np.sin(alpha)))
 
 
     ''' '''
-    def build_Xn(self, f, A, a, alpha, mu):
+    def build_Xn(self, f, A, alpha, mu):
         rows = f.shape[0]
+        if A is None and mu is None:
+            X = np.hstack((f, np.cos(alpha), np.sin(alpha)))
+            A = LinearRegression(fit_intercept=True).fit(X, y)
+
         return np.hstack((A[0]*f, A[1]*np.cos(alpha*mu), A[2]*np.sin(alpha*mu)))
 
 
@@ -105,31 +110,37 @@ class DAN2Regressor(object):
     """ Fit method  """
     def fit(self, X, y):
 
+        # Number of rows
+        m = X.shape[0]
+
         ## Get non-linear projection of input records
-        self.model['alpha'] = self.compute_alpha(X)
+        alpha = self.compute_alpha(X)
         
         ## Get linear model from n input cols
-        self.model['f_0'], self.model['A'], self.model['a'] = self.linear_reg(X, y)
-        
+        self.lin_predictor.fit(X, y)
+        f_k = self.lin_predictor.predict(X)
 
-        """ Call algorithm """
-        """ #### """
+        """ Start fit algorithm """
         i = 0
-        while (i<=self.model['depth']):
-            ''' Initial layer assumes 1 for mu '''
+        mu = 1
+        while (i<=self.depth):
             if i==0:
-                Xn = self.build_X1(self.model['f_0'], self.model['alpha'])
+                Xn = self.build_X1(f_k, alpha)
+                lr = LinearRegression(intercept=True).fit(Xn, y)
+                f_k, A = lr.predict(Xn)
+            else:
+                mu = self.minimize(f_k, A, )
+                Xn = self.build_Xn(f_k, alpha, mu)
 
-                # Number of rows
-                m = Xn.shape[0]
+            # Error metrics
+            mse = self.mse(f_k, y, m)
+            pred = np.where(f_k >= 0.5, 1, 0)
+            acc = accuracy_score(y, pred)
 
                 # Initial linear regression w/ mu equal to 1
                 self.model['f_k'], self.model['A'], self.model['a'] = self.linear_reg(Xn, y)
 
-                # Error metrics
-                mse = self.mse(self.model['f_k'], y, m)
-                pred = np.where(self.model['f_k'] >= 0.5, 1, 0)
-                acc = accuracy_score(y, pred)
+                
                 #mse = np.sum((f_k - y)**2) / Xn.shape[0]
 
             else:
@@ -171,6 +182,14 @@ class DAN2Regressor(object):
     def mse(self, f_k, y, m):
         return np.sum((f_k - y)**2) / m        
 
+    def predict(self, X_test):
+        X = X_test
+        alpha = self.compute_alpha(X)
+        f_0 = self.lin_predictor.predict(X)
+
+
+
+        return preds
 
     def plot_error():
         pass
