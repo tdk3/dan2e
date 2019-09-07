@@ -79,9 +79,6 @@ class DAN2Regressor(object):
 
     ''' '''
     def build_X1(self, f, alpha):
-        #print('f', f.shape)
-        #print('alpha', alpha.shape)
-
         return np.hstack((f, np.cos(alpha*self.model['mu']), np.sin(alpha*self.model['mu'])))
 
 
@@ -129,6 +126,7 @@ class DAN2Regressor(object):
                 # Error metrics
                 mse = self.mse(self.model['f_k'], y, m)
                 pred = np.where(self.model['f_k'] >= 0.5, 1, 0)
+
                 acc = accuracy_score(y, pred)
                 #mse = np.sum((f_k - y)**2) / Xn.shape[0]
 
@@ -170,6 +168,22 @@ class DAN2Regressor(object):
 
     def mse(self, f_k, y, m):
         return np.sum((f_k - y)**2) / m        
+
+
+    def predict(self, X_test):
+        pass
+        X = X_test
+
+        # Compute testing alpha
+        alpha = self.compute_alpha(X)
+
+        # Compute initial predictions
+        f_0 = self.model['lr'].predict(X)
+
+        for i, (A, mu) in enumerate(zip(self.model['A'], self.model['mu'])):
+
+        self.build_X1(f_0, alpha)
+
 
 
     def plot_error():
