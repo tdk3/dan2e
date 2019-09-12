@@ -9,31 +9,11 @@ from time import strftime, gmtime
 class DAN2Regressor(object):
 
     def __init__(self, depth=10, bounds=(0,5000000000)):
-
-        #if kwargs['model'] is None:
-        self.model = {
-            'name': strftime('dan2model-'+ str(depth) + '-%Y-%b-%d-%H-%M-%S', gmtime()),
-            'weights': None,
-            'intercept': None,
-            'mu': 1,
-            'f_0': None,
-            'f_k': None,
-            'A': None,
-            'alpha': None,
-            'a': None,
-            'bounds': bounds,
-            'depth': depth,
-            'lr': None,
-            'mu_hist': None
-        }
+        self.bounds = bounds
         self.depth = depth
         self.lin_predictor = LinearRegression(fit_intercept=True)
-        
-
-
-        #else:
-        #    self.model = kwargs['model']
-            
+        self.coef_ = None
+        self.name = strftime('dan2model-'+ str(depth) + '-%Y-%b-%d-%H-%M-%S', gmtime())
 
 
     """ Layer activation """
@@ -96,15 +76,11 @@ class DAN2Regressor(object):
         return np.hstack((A[0]*f, A[1]*np.cos(alpha*mu), A[2]*np.sin(alpha*mu)))
 
 
-    def logging(self, weights, intercept, mu):
-        if self.model['weights'] is None:
-            self.model['weights'] = weights.reshape((1,3))
-            self.model['intercept'] = np.array(intercept)
-            self.model['mu_hist'] = np.array(mu)
+    def logging(self, coef_):
+        if self.coef_ is None:
+            self.coef_ = coef_
         else:
-            self.model['weights'] = np.append(self.model['weights'], weights.reshape((1,3)), axis=0)
-            self.model['intercept'] = np.append(self.model['intercept'], intercept)
-            self.model['mu_hist'] = np.append(self.model['mu'], mu)
+            self.coef_ = np.append(self.coef_ , coef_, axis=0)
 
 
     """ Fit method  """
@@ -126,56 +102,41 @@ class DAN2Regressor(object):
         while (i<=self.depth):
             if i==0:
                 Xn = self.build_X1(f_k, alpha)
-                lr = LinearRegression(intercept=True).fit(Xn, y)
-                f_k, A = lr.predict(Xn)
+                lr = LinearRegression(fit_intercept=True).fit(Xn, y)
+                A = lr.coef_[0]
+                a = lr.intercept_
+                f_k = lr.predict(Xn)
             else:
-                mu = self.minimize(f_k, A, )
-                Xn = self.build_Xn(f_k, alpha, mu)
+                mu = self.minimize(f_k, A, a, alpha)
+                Xn = self.build_Xn(f_k, A, alpha, mu) # eventually override the build_X1 method
+                lr = LinearRegression(fit_intercept=True).fit(Xn, y)
+                A = lr.coef_[0]
+                a = lr.intercept_
+                f_k = lr.predict(Xn) 
 
             # Error metrics
             mse = self.mse(f_k, y, m)
             pred = np.where(f_k >= 0.5, 1, 0)
             acc = accuracy_score(y, pred)
-
-                # Initial linear regression w/ mu equal to 1
-                self.model['f_k'], self.model['A'], self.model['a'] = self.linear_reg(Xn, y)
-
-                
-                #mse = np.sum((f_k - y)**2) / Xn.shape[0]
-
-            else:
-                self.model['mu'] = self.minimize(self.model['f_k'], self.model['A'], self.model['a'], self.model['alpha'])
-                Xn = self.build_Xn(self.model['f_k'], self.model['A'], self.model['a'], self.model['alpha'], self.model['mu'])
-                self.model['f_k'], self.model['A'], self.model['a'], = self.linear_reg(Xn, y)
-                mse = self.mse(self.model['f_k'], y, m)
-                pred = np.where(self.model['f_k'] >= 0.5, 1, 0)
-                acc = accuracy_score(y, pred)
-                #print(A.shape)
-                #mse = np.sum((f_k - y)**2) / Xn.shape[0]
-            '''
-            # move MSE here, change function to receive logistic flag
-            mse = self.error(f_k, y, m, logstic)'''
             
             # Save layer
-            self.logging(self.model['A'], self.model['a'], self.model['mu'])
+            coef_ = A.reshape((1,3))
+            coef_ = np.insert(A, 0, a)
+            coef_ = np.insert(coef_, 0, mu)
+            self.logging(coef_)
 
             # add layers
-            print('Iteration:', i, " Mu:", self.model['mu'], "MSE:", mse, "Accuracy:", acc)
+            print('Iteration:', i, " Mu:", mu, "MSE:", mse, "Accuracy:", acc)
 
             i += 1
-        """ #### """
 
 
     def minimize(self, f_k, A, a, alpha):
-        #print(f_k.shape)
-        #print(A.shape)
-        #print(a.shape)
-        #print(alpha.shape)
         self.f_k = f_k
         self.A = A
         self.alpha = alpha
         self.a = a
-        res = minimize_scalar(self.f, bounds=self.model['bounds'], method='bounded')
+        res = minimize_scalar(self.f, bounds=self.bounds, method='bounded')
         return res.x
         
 
@@ -186,9 +147,6 @@ class DAN2Regressor(object):
         X = X_test
         alpha = self.compute_alpha(X)
         f_0 = self.lin_predictor.predict(X)
-
-
-
         return preds
 
     def plot_error():
