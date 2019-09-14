@@ -44,6 +44,10 @@ def main(X, y, depth):
     clf.fit(X, y)
     path = clf.name
     save_file(path, clf)
+    print(clf.coef_)
+    y_pred = clf.predict(X)
+    
+
 
 
 

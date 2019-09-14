@@ -80,7 +80,7 @@ class DAN2Regressor(object):
         if self.coef_ is None:
             self.coef_ = coef_
         else:
-            self.coef_ = np.append(self.coef_ , coef_, axis=0)
+            self.coef_ = np.vstack((self.coef_ , coef_))
 
 
     """ Fit method  """
@@ -123,13 +123,14 @@ class DAN2Regressor(object):
             coef_ = A.reshape((1,3))
             coef_ = np.insert(A, 0, a)
             coef_ = np.insert(coef_, 0, mu)
+            print(i, coef_)
             self.logging(coef_)
 
             # add layers
             print('Iteration:', i, " Mu:", mu, "MSE:", mse, "Accuracy:", acc)
 
             i += 1
-
+        print(f_k)
 
     def minimize(self, f_k, A, a, alpha):
         self.f_k = f_k
@@ -145,9 +146,24 @@ class DAN2Regressor(object):
 
     def predict(self, X_test):
         X = X_test
+        m = X.shape[0]
         alpha = self.compute_alpha(X)
-        f_0 = self.lin_predictor.predict(X)
-        return preds
+        f_k = self.lin_predictor.predict(X)
+
+        i = 0
+        for coef_ in self.coef_:
+            mu = coef_[0]
+            a = coef_[1]
+            b = coef_[2]
+            c = coef_[3]
+            d = coef_[4]
+            f_k = b*f_k + c*np.cos(alpha*mu) + d*np.sin(alpha*mu)
+            i += 1
+        print(i)
+        return f_k
+
+    def test_fit_and_predict():
+        
 
     def plot_error():
         pass
