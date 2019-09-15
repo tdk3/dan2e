@@ -4,6 +4,7 @@ from scipy.optimize import minimize_scalar
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
+from sklearn.utils.extmath import safe_sparse_dot
 from time import strftime, gmtime
 
 class DAN2Regressor(object):
@@ -14,6 +15,7 @@ class DAN2Regressor(object):
         self.lin_predictor = LinearRegression(fit_intercept=True)
         self.coef_ = None
         self.name = strftime('dan2model-'+ str(depth) + '-%Y-%b-%d-%H-%M-%S', gmtime())
+        #self.lin_predictions = None
 
 
     """ Layer activation """
@@ -95,12 +97,12 @@ class DAN2Regressor(object):
         ## Get linear model from n input cols
         self.lin_predictor.fit(X, y)
         f_k = self.lin_predictor.predict(X)
-
+        self.lin_predictions = f_k
         """ Start fit algorithm """
-        i = 0
+        i = 1
         mu = 1
         while (i<=self.depth):
-            if i==0:
+            if i==1:
                 Xn = self.build_X1(f_k, alpha)
                 lr = LinearRegression(fit_intercept=True).fit(Xn, y)
                 A = lr.coef_[0]
@@ -121,7 +123,7 @@ class DAN2Regressor(object):
             
             # Save layer
             coef_ = A.reshape((1,3))
-            coef_ = np.insert(A, 0, a)
+            coef_ = np.insert(coef_, 0, a)
             coef_ = np.insert(coef_, 0, mu)
             print(i, coef_)
             self.logging(coef_)
@@ -130,7 +132,7 @@ class DAN2Regressor(object):
             print('Iteration:', i, " Mu:", mu, "MSE:", mse, "Accuracy:", acc)
 
             i += 1
-        print(f_k)
+        return f_k
 
     def minimize(self, f_k, A, a, alpha):
         self.f_k = f_k
@@ -144,12 +146,15 @@ class DAN2Regressor(object):
     def mse(self, f_k, y, m):
         return np.sum((f_k - y)**2) / m        
 
+    def _activation_function(X, coef_):
+        return safe_sparse_dot(X, coef_.T)
     def predict(self, X_test):
         X = X_test
         m = X.shape[0]
         alpha = self.compute_alpha(X)
         f_k = self.lin_predictor.predict(X)
-
+        #print(np.array_equal(f_k, self.lin_predictions))
+        #f_k = f_k + np.cos(alpha) + np.sin(alpha)
         i = 0
         for coef_ in self.coef_:
             mu = coef_[0]
@@ -157,13 +162,12 @@ class DAN2Regressor(object):
             b = coef_[2]
             c = coef_[3]
             d = coef_[4]
-            f_k = b*f_k + c*np.cos(alpha*mu) + d*np.sin(alpha*mu)
+
+            #f_k = a + b*f_k + c*np.cos(alpha*mu) + d*np.sin(alpha*mu)
+            f_k = _activation_function(X, np.array([b,c,d]))
             i += 1
-        print(i)
         return f_k
 
-    def test_fit_and_predict():
-        
 
     def plot_error():
         pass

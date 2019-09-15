@@ -38,15 +38,19 @@ def save_file(path, model):
     with open(path + '.pk', 'wb') as save_file:
         pickle.dump(model, save_file)
 
+def test_fit_and_predict(training_preds, testing_preds):
+    return np.array_equal(training_preds, testing_preds)
 
 def main(X, y, depth):
     clf = dan2.DAN2Regressor(depth=depth)
-    clf.fit(X, y)
+    tr_pred = clf.fit(X, y)
     path = clf.name
     save_file(path, clf)
     print(clf.coef_)
     y_pred = clf.predict(X)
-    
+    print(tr_pred, y_pred)
+    print(test_fit_and_predict(tr_pred, y_pred))
+
 
 
 
