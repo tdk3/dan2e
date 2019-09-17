@@ -80,7 +80,8 @@ class DAN2Regressor(object):
 
     def logging(self, coef_):
         if self.coef_ is None:
-            self.coef_ = coef_
+            self.coef_ = coef_.reshape(1,5)
+
         else:
             self.coef_ = np.vstack((self.coef_ , coef_))
 
@@ -101,7 +102,7 @@ class DAN2Regressor(object):
         """ Start fit algorithm """
         i = 1
         mu = 1
-        while (i<=self.depth):
+        while (i <= self.depth):
             if i==1:
                 Xn = self.build_X1(f_k, alpha)
                 lr = LinearRegression(fit_intercept=True).fit(Xn, y)
@@ -146,27 +147,34 @@ class DAN2Regressor(object):
     def mse(self, f_k, y, m):
         return np.sum((f_k - y)**2) / m        
 
-    def _activation_function(X, coef_):
-        return safe_sparse_dot(X, coef_.T)
+    def _activation_function(self, X, coef_):
+        intercept = coef_[0]
+        A = coef_[1:]
+        return safe_sparse_dot(X, A.T, dense_output=True) + intercept
+
     def predict(self, X_test):
         X = X_test
         m = X.shape[0]
         alpha = self.compute_alpha(X)
         f_k = self.lin_predictor.predict(X)
-        #print(np.array_equal(f_k, self.lin_predictions))
-        #f_k = f_k + np.cos(alpha) + np.sin(alpha)
         i = 0
+
         for coef_ in self.coef_:
             mu = coef_[0]
-            a = coef_[1]
-            b = coef_[2]
-            c = coef_[3]
-            d = coef_[4]
+            if i == 0:
+                X = np.hstack((f_k, np.cos(alpha*mu), np.sin(alpha*mu)))
+                f_k = self._activation_function(X, coef_[1:])
+                f_k = f_k.reshape(m,1)
+            else:
+                X = np.hstack((prev_coef_[2]*f_k, prev_coef_[3]*np.cos(alpha*mu), prev_coef_[4]*np.sin(alpha*mu)))
+                f_k = self._activation_function(X, coef_[1:])
+                f_k = f_k.reshape(m,1)
 
-            #f_k = a + b*f_k + c*np.cos(alpha*mu) + d*np.sin(alpha*mu)
-            f_k = _activation_function(X, np.array([b,c,d]))
             i += 1
+            prev_coef_ = coef_
         return f_k
+
+
 
 
     def plot_error():
